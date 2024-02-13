@@ -61,11 +61,12 @@ module FileIO
 
   contains
   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    integer function FileNumCol(FileName, sep)
+    integer function FileNumCol(FileName, sep, informat)
       implicit none
 
       character(len=*), intent(IN) :: FileName
       character(len=*), intent(IN), optional :: sep
+      character(len=*), intent(IN), optional :: informat
       integer :: j, strLen, numcol
       character(len=:), allocatable :: line
       character(len=1) :: s(2)
@@ -80,7 +81,13 @@ module FileIO
       allocate(character(len=500000) :: line)
 
       open(unit=102, file=trim(FileName), status="old")
-      read(102, *) ! Skips the first line to avoid error when using file with header (eg. RAW format)
+      
+      if (present(informat)) then
+        if (informat == 'RAW') then
+          read(102, *) ! Skips the first line to avoid error when using file with header (eg. RAW format)
+        endif
+      endif
+      
       read(102, '(a)' ) line
       close(102) 
 
@@ -280,7 +287,7 @@ subroutine Reformat
     case('PED')
       nSnp = (FileNumCol(trim(GenoIN)) -6)/2
     case('RAW')
-      nSnp = FileNumCol(trim(GenoIN)) -6
+      nSnp = FileNumCol(trim(GenoIN), informat="RAW") -6
     case('LMT')
       nSnp = FileNumCol(trim(GenoIN), sep='')
   end select  
