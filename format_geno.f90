@@ -80,6 +80,7 @@ module FileIO
       allocate(character(len=500000) :: line)
 
       open(unit=102, file=trim(FileName), status="old")
+      read(102, *) ! Skips the first line to avoid error when using file with header (eg. RAW format)
       read(102, '(a)' ) line
       close(102) 
 
