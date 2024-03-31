@@ -11,7 +11,8 @@ module sqa_general
   integer, parameter :: ishort = selected_int_kind(1), ilong=selected_int_kind(8) 
   integer, parameter :: nchar_ID=40
   ! inheritance rules/probabilities; O=observed, A=actual
-  double precision :: OcA(0:2,-1:2), OKA2P(-1:2,0:2,0:2), AKA2P(0:2,0:2,0:2)  
+  double precision :: OcA(0:2,-1:2), OKA2P(-1:2,0:2,0:2), AKA2P(0:2,0:2,0:2), &
+    lOcA(0:2, -1:2), lAKA2P(0:2,0:2,0:2)
   double precision, allocatable :: AHWE(:,:), OHWE(:,:), AKAP(:,:,:), OKAP(:,:,:) 
   
   interface mk_OcA
@@ -80,6 +81,8 @@ contains
     else
       stop 'precalcProbs needs either Er or ErV'
     endif 
+    
+    lOcA = LOG(OcA)
 
     ! probabilities actual genotypes under HWE
     allocate(AHWE(0:2,nSnp))
@@ -101,6 +104,8 @@ contains
     AKA2P(2,0,:) = dble((/ 0.0, 0.0, 0.0 /))
     AKA2P(2,1,:) = dble((/ 0.0, 0.25,0.5 /))
     AKA2P(2,2,:) = dble((/ 0.0, 0.5, 1.0 /))
+    
+    lAKA2P = LOG(AKA2P)
     
     ! probabilities observed genotypes under HWE  + genotyping error pattern
     allocate(OHWE(-1:2,nSnp))
