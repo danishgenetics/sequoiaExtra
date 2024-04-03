@@ -59,6 +59,35 @@ descendants, full siblings, and their mates.
 The last method also allows the correction of some genotyping errors,
 the others do not.
 
+## Genotype format
+
+Four different genotype formats are supported for input and output,
+which are all internally converted to the ‘sequoia’ format:
+
+### `SEQ` (sequoia, .txt)
+
+No header row, IDs in column 1, then 1 column per SNP with genotypes
+coded as 0, 1 or 2 copies of the reference (typically minor) allele,
+with missing values coded as a negative integer.
+
+### `RAW` (from PLINK `--recode A`, .raw)
+
+Header row with SNP names, IDs in column 2 of 6 non-SNP columns, then 1
+column per SNP with genotypes coded as 0, 1 or 2 copies of the reference
+(typically minor) allele, with missing values coded as ‘NA’.
+
+### `PED` (PLINK .ped/.map file pair)
+
+No header row, IDs in column 2 of 6 non-SNP columns, then 2 columns per
+SNP with alleles coded as A,C,T,G or as 1,2, and missing values coded as
+0. The .map file contains the SNP names and positions. (position
+information is not retained)
+
+### `LMT` (.geno/.id file pair)
+
+No header row, genotypes coded as 0/1/2 without spacing, missing values
+not allowed, IDs in separate file.
+
 ------------------------------------------------------------------------
 
 # Method `parent`
@@ -117,7 +146,7 @@ sire
 0
 </td>
 <td style="text-align:left;">
-*
+\*
 </td>
 <td style="text-align:left;">
 2
@@ -128,13 +157,13 @@ sire
 1
 </td>
 <td style="text-align:left;">
-*
+\*
 </td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:left;">
-*
+\*
 </td>
 </tr>
 <tr>
@@ -145,7 +174,7 @@ sire
 2
 </td>
 <td style="text-align:left;">
-*
+\*
 </td>
 <td style="text-align:left;">
 0
@@ -339,13 +368,13 @@ most<br>common
 0.5
 </td>
 <td style="text-align:center;">
-*
+\*
 </td>
 <td style="text-align:center;">
 1
 </td>
 <td style="text-align:center;">
-*
+\*
 </td>
 <td style="text-align:center;">
 1
@@ -492,20 +521,29 @@ further testing and optimising is needed).
 The iterative peeling step is done before the genotype cleaning step,
 and again between the genotype cleaning step and the imputation step.
 
+------------------------------------------------------------------------
+
+# Options
+
 ## Pedigree cleaning
 
 Errors in the pedigree will also negatively affect the imputation
-accuracy. For each parent-offspring pair it is checked whether their
-genotypes across all SNPs are consistent with being parent and
-offspring, given the genotyping error rate `--err`, or if they are more
-likely to be otherwise related, or unrelated. For details, see
-<https://github.com/JiscaH/sequoiaExtra/tree/main/pedigree_checker> ;
-parent-parent-offspring trios are tested as two separate
+accuracy. Before imputation,  
+for each parent-offspring pair it is checked whether their genotypes
+across all SNPs are consistent with being parent and offspring, given
+the genotyping error rate `--err`, or if they are more likely to be
+otherwise related, or unrelated. For details, see
+<https://github.com/JiscaH/sequoiaExtra/tree/main/pedigree_checker> .
+Parent-parent-offspring trios are tested as two separate
 parent-offspring pairs.
 
 If the probability to be parent-offspring is less than `--T-pedclean`
 (default: 0.05), the parent-offspring link is removed from the pedigree.
-This step can be skipped with `--no-pedclean`.
+Removed links are written to file `pedclean_edits.txt`, with columns id,
+parent_id, parent_sex, and the probabilities that the samples are from
+the same individual (prob_S), parent-offspring (prob_PO), full siblings
+(prob_FS), second degree relatives (prob_GP), third degree relatives
+(prob_HA), or unrelated individuals (prob_UU).
 
 Note that only genotyped-genotyped parent-offspring pairs are
 considered. E.g. full sibling pairs where one or both parents are not
@@ -515,9 +553,7 @@ genotyped are not checked, for this run `sequoia`
 in the sequoia R package
 (<https://jiscah.github.io/reference/CalcOHLLR.html> ).
 
-------------------------------------------------------------------------
-
-# Options
+This step can be skipped with `--no-pedclean`.
 
 ### `--T_impute`
 
@@ -578,35 +614,26 @@ file into N chunks, do the calculations on each chunk in parallel,
 combine the logfiles, and apply the full list of edits to the original
 genotype file.
 
-# Output
-
-## pedclean log
-
-To write.
-
 ## snpclean + imputation log
 
-File with a record for each edit made. If a genotype was first set to
-missing by `snpclean`, and then imputed by `impute`, there will be 2
-entries in the log.
+By default a log file is created with a record for each edit made to the
+genotype data, irrespective of the imputation method chosen.
 
 Column names are : ‘snp_index’, ‘snp_name’, ‘threshold’, ‘id_index’,
-‘id_name’, ‘g_in’, ‘g_out’, ‘prob_0’, ‘prob_1’, ‘prob_2’
-
-here ‘index’ refers to the column number / row number in the genotype
-file, it is 0 for completely non-genotyped individuals in the pedigree
-(when `--impute-all`). g_in and g_out are the genotypes in the genotypes
-in the input and output genotype file, coded as 0/1/2 and -1 for missing
+‘id_name’, ‘g_in’, ‘g_out’, ‘prob_0’, ‘prob_1’, ‘prob_2’. Here ‘index’
+refers to the column number / row number in the genotype file, it is 0
+for completely non-genotyped individuals in the pedigree (when
+`--impute-all`). g_in and g_out are the genotypes in the genotypes in
+the input and output genotype file, coded as 0/1/2 and -1 for missing
 values.
+
+Note that if a genotype was first set to missing by `snpclean`, and then
+imputed by `impute`, there will be 2 entries in the log.
 
 The filename for this log can be specified with `--edits-out`. The log
 can also be turned off with `--no-edits-out`, which gives a slight speed
 increase - which is neglible with `method=full`, but can be relatively
 large for the faster methods.
-
-## Genotypes
-
-To write.
 
 # Algorithm details
 
