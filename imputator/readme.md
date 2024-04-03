@@ -20,8 +20,8 @@ information from linked SNPs see e.g. Beagle or AlphaImpute.
 -   run the program: `./imputator --geno <filename>`. For an overview of
     the options, run `./imputator --help`.
 
-> \[!CAUTION\] This program is under development and not extensively
-> tested yet. Use is entirely at your own risk.
+> [!CAUTION] 
+> This program is under development and not extensively tested yet. Use is entirely at your own risk.
 
 ## Methods overview
 
