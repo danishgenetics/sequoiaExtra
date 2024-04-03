@@ -209,6 +209,7 @@ contains
     end select  
   
     allocate(G_int(nSnp))
+    G_int = -1
     allocate(Geno(0:nInd, nSnp))   
     Geno = -1
     
@@ -220,24 +221,22 @@ contains
       if (FileFormat=='RAW') then
         read (101,*) dumC, dumC, dumV, SNP_names   ! header
       endif
-      ! TODO: select once, not every iteration (speed effect?)
       do i=1,nInd
         select case (FileFormat)
           case ('SEQ')
             read (101,*,IOSTAT=ios)  Id(i), G_int
           case('PED')
-            read (101,*,IOSTAT=ios) dumC, Id(i), dumV, G_duos(i,:)
+            read (101,*,IOSTAT=ios) dumC, Id(i), dumV, G_duos(i,:)  
           case('RAW')
             read (101,*,IOSTAT=ios) dumC, Id(i), dumV, G_char
-            WHERE (G_char == 'NA')  G_char = '-9'
-            do l=1,nSnp
-              read(G_char(l), '(i2)',IOSTAT=ios) G_int(l)
-            enddo
+            G_int = -1
+            WHERE(G_char=='0')  G_int = 0
+            WHERE(G_char=='1')  G_int = 1
+            WHERE(G_char=='2')  G_int = 2
           case('LMT')
             read (101,'(500000i1)',IOSTAT=ios)  G_int
         end select
         if (ios /= 0)  call IOstat_handler(ios, i, trim(GenoFile))
-
         WHERE (G_int >= 0 .and. G_int <= 2)  Geno(i,:) = G_int     
       enddo
     close (101)
@@ -246,7 +245,7 @@ contains
       call Two2One()
     endif
     
-    deallocate(G_int)
+    if (allocated(G_int))  deallocate(G_int)
     if(allocated(G_duos))  deallocate(G_duos)
     if(allocated(G_char))  deallocate(G_char)
        
@@ -366,8 +365,8 @@ contains
       stop
     endif    
     GenoFile = add_extension(FileName, FileFormat)
-    
-    if (FileFormat == 'RAW')  allocate(G_char(nSnp))   ! uses NA for missing values
+     
+    allocate(G_char(nSnp))   ! if (FileFormat == 'RAW')   uses NA for missing values
     
     if (present(make_map)) then
       do_make_map = make_map
@@ -400,24 +399,26 @@ contains
       endif
       do i=1,nInd
         G_int = Geno(:,i)
+        G_char = '-1'
+        WHERE(G_int==0) G_char='0 '
+        WHERE(G_int==1) G_char='1 '
+        WHERE(G_int==2) G_char='2 '
+            
         select case (FileFormat)
           case ('SEQ')
-            write(202, '(a40, 100000i3)') Id(i), G_int
+            write(202, '(a40, 100000a3)') Id(i), G_char  ! G_int
           case('PED')
             write(202, '(i3,2x,a40,4i3,2x, 200000a2)') 0, Id(i), 0,0,0,-9, G_duos(:,i) 
           case('RAW')
-            do l=1,nSnp
-              write(G_char(l), '(i2)')  G_int(l)
-            enddo
-            WHERE (G_char == '-9')  G_char = 'NA'
+            WHERE (G_char=='-1') G_char='NA'
             write(202, '(i4,2x,a40,4i5,2x, 200000a3)') 0, Id(i), 0,0,0,0, G_char
           case('LMT')
             if (any(G_int < 0) .and. .not. did_warn) then  ! warning once is enough
               print *, 'WARNING: LMT does not support missing values! Coded as 9 in output'
               did_warn = .TRUE.         
             endif
-            WHERE (G_int < 0)  G_int = 9
-            write(202,'(500000i1)')  G_int
+            WHERE (G_char=='-1') G_char='9 '
+            write(202,'(500000a1)')  G_char
         end select 
       enddo
     close(202)
