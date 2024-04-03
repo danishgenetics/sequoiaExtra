@@ -1040,7 +1040,7 @@ contains
     
     do i=1,N
       if (Gl(i) /= -1)  cycle
-!      if (ALL(Gprob(:,i) < log(Threshold)))  cycle
+      if (ALL(Gprob(:,i) < log(Threshold)))  cycle
       if (COUNT(Gprob(:,i) >= doubt_threshold) > 1) then    
         select case (imp_default)
           case ('het')  
@@ -1054,7 +1054,7 @@ contains
           case ('com')
             g_new = g_common
         end select
-      else if (ANY(Gprob(:,i) >= log(Threshold))) then
+      else 
         g_new = MAXLOC(Gprob(:,i), DIM=1, KIND=ishort) -1_ishort
       endif
       if (with_log) then
@@ -1190,7 +1190,7 @@ contains
 
     ! write to file  (excl indiv 0)
     call write_geno(Geno=transpose(geno(1:,:)), nInd=SIZE(geno,DIM=1)-1, nSnp=SIZE(geno,DIM=2),&
-      ID=IdV, FileName=GenoOutFile, FileFormat=GenoOutFormat)
+      ID=IdV, SNP_names=SNP_names, FileName=GenoOutFile, FileFormat=GenoOutFormat)
   
   end subroutine apply_edits
 
@@ -1446,7 +1446,7 @@ program main
     call clean_n_impute(EditsFile)  
     if (.not. quiet)  call printt('writing new genotypes to file ...')
     call write_geno(Geno=transpose(geno(1:,:)), nInd=SIZE(geno,DIM=1)-1, nSnp=SIZE(geno,DIM=2),&
-      ID=IdV, FileName=GenoOutFile, FileFormat=GenoOutFormat)
+      ID=IdV, SNP_names=SNP_names, FileName=GenoOutFile, FileFormat=GenoOutFormat)
   
   else if (do_geno_out) then
     if (.not. quiet)  call printt('writing new genotypes to file ...')
@@ -1488,7 +1488,7 @@ contains
     Threshold_snpclean = 0.01
     do_impute = .TRUE.
     do_impute_all = .FALSE.
-    Threshold_impute = 0.9
+    Threshold_impute = 0 !0.9
     imp_default = 'het'
     tol = 0.0001d0
     do_geno_out = .TRUE.
@@ -1721,7 +1721,7 @@ contains
                     '                         a genotyping error and replace/set to missing. Default: 0.001'
     print '(a)',    '  --no-snpclean        no removal of probable genotyping errors'                
     print '(a)',    '  --T-impute <value>   threshold: minimum probability of estimated genotype for',&
-                    '                        Imputation (Future version will use set of decreasing tresholds)'
+                    '                        imputation. Default=0'
     print '(a)',    '  --no-impute          no imputation' 
     print '(a)',    '  --impute-all         impute all individuals in the pedigree (default: only those in genotype file)'
     
