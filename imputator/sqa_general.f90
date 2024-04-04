@@ -8,8 +8,6 @@
 module sqa_general
   implicit none
   
-  integer, parameter :: ishort = selected_int_kind(1), ilong=selected_int_kind(8) 
-  integer, parameter :: nchar_ID=40
   ! inheritance rules/probabilities; O=observed, A=actual
   double precision :: OcA(0:2,-1:2), OKA2P(-1:2,0:2,0:2), AKA2P(0:2,0:2,0:2), &
     lOcA(0:2, -1:2), lAKA2P(0:2,0:2,0:2)

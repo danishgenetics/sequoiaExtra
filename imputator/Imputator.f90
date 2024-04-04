@@ -14,7 +14,7 @@
 !===============================================================================
 
 module global_variables 
-  use sqa_general, ONLY: ishort, nchar_ID
+  use sqa_fileIO, ONLY: ishort, nchar_ID
   implicit none
 
   character(len=35), parameter :: version = "Imputator v0.3.4 (30 March 2024)"
@@ -51,8 +51,7 @@ end module global_variables
 
 module pedigree_fun
   ! TODO: separate source file
-  use sqa_general, ONLY: nchar_ID
-  use global_variables, ONLY: nIndG, nIndT, nInd_max, nMatings, individual, IdV, &
+  use global_variables, ONLY: nchar_ID, nIndG, nIndT, nInd_max, nMatings, individual, IdV, &
     chunk_size_small, chunk_size_large, nMat_max, matingnode, indiv2mating  ! , mating2parent
   implicit none
   
@@ -597,7 +596,7 @@ contains
     
     character(len=*), intent(IN) :: EditsFileName
     real, intent(IN) :: Threshold
-    integer :: i, k, par(2), n_
+    integer :: i, k, par(2)
     double precision :: probs_ip(nRel)
     
     call init_pairLL()
@@ -744,10 +743,10 @@ end module Generations
 !===============================================================================
 module impute_fun
   ! TODO: divide into submodules?
-  use global_variables, ONLY: nSnp, Geno, SNP_names, quiet
+  use global_variables, ONLY: ishort, nSnp, Geno, SNP_names, quiet
   use Generations, ONLY: calc_Gens, Gen_rank_down, Gen_rank_up
   ! for prob_ant_post
-  use sqa_general, ONLY: ishort, logSumExp, logScale, OcA, AHWE, lOcA, lAKA2P
+  use sqa_general, ONLY: logSumExp, logScale, OcA, AHWE, lOcA, lAKA2P
   use pedigree_fun
   
   implicit none
@@ -1788,7 +1787,7 @@ contains
   ! calculate allele frequencies (SNPs in D2)
   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   pure function calcAF()
-    use sqa_general, ONLY: ishort, ilong
+    use sqa_fileIO, ONLY: ishort, ilong
     
     double precision :: calcAF(nSnp)
     integer :: l

@@ -6,9 +6,11 @@
 !
 !===============================================================================
 module sqa_fileIO
-  use sqa_general
+!  use sqa_general
   implicit none
-   
+  
+  integer, parameter :: ishort = selected_int_kind(1), ilong=selected_int_kind(8)  
+  integer, parameter :: nchar_ID=40  
   character(len=3), dimension(4) :: valid_formats = (/'SEQ', 'PED', 'RAW', 'LMT'/)
   character(len=1), allocatable :: alleles(:,:)
   
@@ -317,7 +319,6 @@ contains
           endif
         enddo
       
-        ! TODO: try various alternatives to find fastest way
         do i=1,nInd
           Gi = Gl(:,i)
           if (all(Gi == '0')) then
@@ -328,13 +329,12 @@ contains
             Gint(i) = 2
           else if (any(Gi==alleles(1,l)) .and. any(Gi==alleles(2,l))) then
             Gint(i) = 1
-          else  ! shouldn't happen
+          else  ! shouldn't happen, but if so treat as missing
             Gint(i) = -1
           endif
         enddo 
         Geno(1:nInd,l) = Gint
       enddo      
- !     print *, 'genotype counts:', COUNT(Gint==0), COUNT(Gint==1), COUNT(Gint==2), COUNT(Gint==-1)
       
     end subroutine Two2One
 
