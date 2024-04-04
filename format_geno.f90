@@ -1,17 +1,28 @@
+! re-format SNP genotype data between various formats
+! Jisca Huisman, jisca.huisman@gmail.com
+!
+! This code is available under GNU General Public License v3
+!
+! Compilation: 
+! gfortran -O3 sqa_fileIO.f90 format_geno.f90 -o formatter
+! debug:
+! gfortran -g -fall-intrinsics -Wall -pedantic -fbounds-check -Og sqa_fileIO.f90 format_geno.f90 -o formatter
+
+
 !===============================================================================
 
 module Global_variables
   implicit none
 
-  integer, parameter :: is = selected_int_kind(1)
-  integer, parameter :: nchar_filename = 2000, nchar_ID = 40
+ ! integer, parameter :: ishort = selected_int_kind(1)
+  integer, parameter :: nchar_filename = 2000!, nchar_ID = 40
   character(len=nchar_filename) :: InFile, OutFile, GenoIN, GenoOUT
   character(len=3) :: InFormat, OutFormat
   logical :: quiet, make_map
   
   
-  contains
-    ! option documentation
+contains
+   ! option documentation
   subroutine print_help()
     print '(a, /)', ' ~~ Reformat SNP data between various formats ~~'
     print '(a, /)', 'command-line options:'
@@ -19,219 +30,33 @@ module Global_variables
     print '(a)',    '  --in, --genoIN   <filename>  Original genotype data file, without file extension.'  
     print '(a)',    '  --out, --genoOUT <filename>   filename for re-formatted genotypes. An existing ', &                 
                     '                       file will be overwritten unless --warn is used'
-    print '(a)',    '  --informat <x>   SEQ: no header, 0/1/2/-9, IDs in column 1; .txt', &  
-                    '                   PED: no header, 11/12/22/00, IDs in column 2 of 6 ', &
-                    '                      non-SNP columns; .ped (+.map)', &
+    print '(a)',    '  --informat <x>   SEQ: no header, 0/1/2, missing -9, IDs in column 1; .txt', &  
+                    '                   PED: no header, IDs in column 2 of 6 non-SNP columns, then',&
+                    '                     2 columns per SNP coded 11/12/22, missing 00; .ped (+.map)',&
+                    '                     input as A/C/T/G requires more memory; output is always 1/2',&
                     '                   RAW: header, 0/1/2/NA, IDs in column 2 of 6 non-SNP columns; .raw', &
                     '                   LMT: no header, 0/1/2 without spacing, IDs in separate file;', &
-                    '                      .geno + .id'                     
+                    '                      .geno + .id. Missing values not allowed (coded 9 in output)'                     
     print '(a)',    '  --outformat <x>  same options as for --informat' 
-    print '(a)',    '  --makemap        only if --outformat is PED: create associated .map file'   
+    print '(a)',    '  --make-map        only if --outformat is PED: create associated .map file'   
     print '(a)',    '  --warn          warn if output file exist, & prompt for user whether to continue'   
-    print '(a)',     '  --quiet         hide messages'
+    print '(a)',    '  --quiet         hide messages'
     print '(a)',    ''
   end subroutine print_help
-  
-  
-    !~~~~~~~~~~~~~~~~~~
-  function add_extension(FileName, FileFormat)
-    character(len=nchar_filename), intent(IN) :: FileName
-    character(len=3), intent(IN) :: FileFormat
-    character(len=nchar_filename) :: add_extension
-    
-    select case (FileFormat)
-      case ('SEQ')
-        add_extension = trim(FileName)//'.txt'
-      case('PED')
-        add_extension = trim(FileName)//'.ped'
-      case('RAW')
-        add_extension = trim(FileName)//'.raw'
-      case('LMT')
-        add_extension = trim(FileName)//'.geno'
-    end select   
-  
-  end function add_extension
   
 end module Global_variables
 
 !===============================================================================
 
-module FileIO
-  implicit none 
-
-contains
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ! determine the number of columns in a file
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  integer function FileNumCol(FileName, sep, has_header)
-    character(len=*), intent(IN) :: FileName
-    character(len=*), intent(IN), optional :: sep
-    logical, intent(IN), optional :: has_header   ! skip header (if any), which has more characters due to long SNP names
-    integer :: j, strLen, numcol, ios
-    character(len=:), allocatable :: line
-    character(len=1) :: s(2)
-    logical :: skip_header
-    
-    if (present(sep)) then   ! separator
-      s = (/ sep, '' /)
-    else
-      s = (/ ' ', achar(9) /)  ! achar(9) = \t (tab)
-    endif
-    
-    if (present(has_header)) then
-      skip_header = has_header
-    else
-      skip_header = .FALSE.
-    endif
-    
-    allocate(character(len=500000) :: line)
-
-    open(unit=102, file=trim(FileName), status="old")
-    if (skip_header) then
-      read(102,*,IOSTAT=ios)   
-      if (ios < 0) then
-        FileNumCol = 0
-        return
-      endif
-    endif
-    read(102, '(a)',IOSTAT=ios) line
-    if (ios < 0) then
-      FileNumCol = 0
-      return
-    endif
-    close(102) 
-
-    strLen = len_trim(line)
-    if (strLen >= 500000)  print *, 'WARNING: '//trim(FileName)//' EXCEEDING MAXIMUM NUMBER OF COLUMNS!'
-    
-    if (strLen  == 0) then
-      FileNumCol = 0
-      return
-    endif
-    
-    if (all(s=='')) then
-      FileNumCol = strLen
-      return
-    endif
-
-    numcol = 0   ! first column (no space 'after')  achar(9) = \t
-    do j=1, strLen-1
-      if (j==1 .and. .not. any(s == line(j:j))) then
-        numcol = numcol +1
-      endif
-      if (any(s == line(j:j))) then
-        if (.not. any(s == line((j+1):(j+1)))) then
-          numcol = numcol +1    ! new column starts at j+1
-        endif
-      endif
-    enddo
-    FileNumCol = numcol
-
-  end function FileNumCol
-
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ! determine the number of rows in a file
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  integer function FileNumRow(FileName)
-    character(len=*), intent(IN) :: FileName
-    integer :: nrow, i, maxRow, ios
-    character(len=42) :: dumC
-
-    maxRow = 1e6  ! fail safe
-    nrow = 0
-    open(unit=102, file=trim(FileName), status="old", action='read')
-      do i=1, maxRow
-        read(102,*,IOSTAT=ios) dumC
-        if (ios < 0) then
-          exit  ! end of file
-        else
-          nrow = nrow +1  
-        end if
-      enddo
-    close(102)
-    if (nrow >= maxRow) print *, 'WARNING: '//trim(FileName)//' EXCEEDING MAXIMUM NUMBER OF ROWS!'
-    FileNumRow = nrow
-
-  end function FileNumRow 
-  
-end module FileIO
-
-!===============================================================================
-
 program main
-  use FileIO
+  use sqa_FileIO
   use Global_variables
   implicit none
-  
-  integer :: i, x, nArg
-  character(len=32) :: arg
-  character(len=3) :: ValidFormats(4)
+
   character(len=1) :: answer  
   logical :: FileExists, file_warn
   
-  ! set default values
-  InFile = 'geno'
-  OutFile = 'geno'
-  InFormat = 'ZZZ'
-  OutFormat = 'ZZZ'
-  ValidFormats = (/'SEQ', 'PED', 'RAW', 'LMT'/)
-  file_warn = .FALSE.
-  make_map = .FALSE.
-  quiet = .FALSE.
-
-  
-  nArg = command_argument_count()
-  i = 0
-  do x = 1, nArg
-    i = i+1
-    if (i > nArg)  exit
-    call get_command_argument(i, arg)
-    
-    select case (arg) 
-
-      case ('--help')
-        call print_help()
-        stop    
-      
-      case ('--in', '--genoIN')  
-        i = i+1
-        call get_command_argument(i, InFile)
-        
-      case ('--out', '--genoOUT')  
-        i = i+1
-        call get_command_argument(i, OutFile)
-        
-      case ('--informat', '--inFormat')
-        i = i+1
-        call get_command_argument(i, InFormat)
-        if (.not. any(ValidFormats == InFormat)) then
-          print *, 'ERROR: inFormat must be one of: ', ValidFormats
-          stop
-        endif
-        
-      case ('--outformat', '--outFormat')
-        i = i+1
-        call get_command_argument(i, OutFormat)
-        if (.not. any(ValidFormats == OutFormat)) then
-          print *, 'ERROR: outFormat must be one of: ', ValidFormats
-          stop
-        endif
-        
-      case ('--makemap')
-        make_map = .TRUE.
-        
-      case ('--quiet')
-        quiet = .TRUE.
-        
-      case ('--warn')
-        file_warn = .TRUE.
-       
-      case default
-        print '(2a, /)', 'ERROR: Unrecognised command-line option: ', arg
-        stop
-
-    end select
-  end do  
+  call read_args()
   
   ! ~~~~~~~~~~~~~~~~~~~~~~~  
   ! add file extensions
@@ -244,11 +69,7 @@ program main
   endif
   
   ! check if files exist
-  inquire(file=trim(GenoIN), exist = FileExists)
-  if (.not. FileExists) then
-    print *, 'ERROR: input file '//trim(GenoIN)//' not found!'
-    stop
-  endif
+  call checkFile(GenoIN)
   
   if (file_warn) then
     inquire(file=trim(OutFile), exist = FileExists)
@@ -259,9 +80,81 @@ program main
     endif
   endif
   
-  call Reformat()   ! make filenames & formats global, or pass to subroutine?
+  call Reformat()   
 
   print *, 'done.'
+  
+contains
+  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  !  read in command line arguments
+  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  subroutine read_args()
+    integer :: nArg, i, x
+    character(len=32) :: arg
+  
+    ! set default values
+    InFile = 'geno'
+    OutFile = 'geno'
+    InFormat = 'ZZZ'
+    OutFormat = 'ZZZ'
+    file_warn = .FALSE.
+    make_map = .FALSE.
+    quiet = .FALSE.
+    
+    nArg = command_argument_count()
+    i = 0
+    do x = 1, nArg
+      i = i+1
+      if (i > nArg)  exit
+      call get_command_argument(i, arg)
+      
+      select case (arg) 
+
+        case ('--help')
+          call print_help()
+          stop    
+        
+        case ('--in', '--genoIN')  
+          i = i+1
+          call get_command_argument(i, InFile)
+          
+        case ('--out', '--genoOUT')  
+          i = i+1
+          call get_command_argument(i, OutFile)
+          
+        case ('--informat', '--inFormat')
+          i = i+1
+          call get_command_argument(i, InFormat)
+          if (.not. any(valid_formats == InFormat)) then
+            print *, 'ERROR: inFormat must be one of: ', valid_formats
+            stop
+          endif
+          
+        case ('--outformat', '--outFormat')
+          i = i+1
+          call get_command_argument(i, OutFormat)
+          if (.not. any(valid_formats == OutFormat)) then
+            print *, 'ERROR: outFormat must be one of: ', valid_formats
+            stop
+          endif
+          
+        case ('--make-map')
+          make_map = .TRUE.
+          
+        case ('--quiet')
+          quiet = .TRUE.
+          
+        case ('--warn')
+          file_warn = .TRUE.
+         
+        case default
+          print '(2a, /)', 'ERROR: Unrecognised command-line option: ', arg
+          stop
+
+      end select
+    end do  
+
+  end subroutine read_args
   
 end program main
 
@@ -269,18 +162,16 @@ end program main
 
 subroutine Reformat
   use Global_variables
-  use FileIO
+  use sqa_FileIO
   implicit none
   
   integer :: nInd, nSnp, i, l, IOerr
   character(len=nchar_ID), allocatable :: ID(:)
-  character(len=25), allocatable :: SNP_names(:)   
+  character(len=nchar_ID), allocatable :: SNP_names(:)   
   character(len=nchar_ID) :: dumC, dumV(4)
-  integer(kind=is), allocatable :: G_int(:), G_duos(:)
+  integer(kind=ishort), allocatable :: G_int(:), G_duos(:), GenoM(:,:)
   character(len=2), allocatable :: G_char(:)
   logical :: FileExists, DidWarn
-  
-  ! TODO: flexible length of IDs & SNP names
 
   nInd = FileNumRow(trim(GenoIN))
   if (InFormat == 'RAW') then
@@ -301,19 +192,35 @@ subroutine Reformat
       nSnp = FileNumCol(trim(GenoIN), sep='')
   end select  
   
-  print *, '# individuals: ', nInd, '; # SNPs: ', nSnp
+  allocate(SNP_names(nSNP))
+  SNP_names = ''
+  allocate(G_char(nSnp))
+  G_char = ''
   
+  print *, '# individuals: ', nInd, '; # SNPs: ', nSnp  
+           
+  ! check if .ped file in A/C/T/G format; if so need to read in one go to ensure
+  ! consistency which homozygote is coded '0' and which '2'.
+  if (InFormat=='PED') then
+    open (unit=101, file=trim(GenoIN), status='old', action='read')
+      read (101,*) dumC, dumC, dumV, G_char
+    close(101) 
+    if (any(G_char=='A') .or. any(G_char=='C') .or. any(G_char=='G') .or. any(G_char=='T')) then
+      allocate(GenoM(nSnp,nInd))    
+      call read_geno(Geno=GenoM, ID=Id, SNP_names=SNP_names, FileName=InFile, &
+        FileFormat = InFormat)   ! this also reads the .map file, if any
+      call write_geno(Geno=GenoM, nInd=nInd, nSnp=nSNP, ID=Id, SNP_names=SNP_names, &
+        FileName=OutFile, FileFormat=OutFormat, make_map=make_map)  
+      deallocate(GenoM)      
+      return
+    endif
+  endif
+  
+
   allocate(G_int(nSnp))
   if (InFormat=='PED' .or. OutFormat=='PED') then
     allocate(G_duos(nSnp*2))   ! 2 columns per SNP format
   endif
-  if (InFormat=='RAW' .or. OutFormat=='RAW') then
-    allocate(G_char(nSnp))   ! uses NA for missing values
-    G_char = ''
-  endif
-  
-  allocate(SNP_names(nSNP))
-  SNP_names = ''
    
   ! read in auxiliary files with SNP names (PED) or IDs (LMT)
   if (InFormat=='PED') then   ! .and. (OutFormat=='PED' .or. OutFormat=='RAW')
@@ -353,6 +260,7 @@ subroutine Reformat
       enddo
     close(303)
   endif
+ 
   
   if ((OutFormat=='RAW' .or. (OutFormat=='PED' .and. make_map)) .and. &
     SNP_names(1)=='' .and. InFormat /= 'RAW') then
@@ -389,33 +297,43 @@ subroutine Reformat
         G_int = Two2One(G_duos)
       case('RAW')
         read (101,*) dumC, Id(i), dumV, G_char
-        WHERE (G_char == 'NA')  G_char = '-9'
-        do l=1,nSnp
-          read(G_char(l), '(i2)') G_int(l)
-        enddo
+        G_int = -1
+        WHERE(G_char=='0')  G_int = 0
+        WHERE(G_char=='1')  G_int = 1
+        WHERE(G_char=='2')  G_int = 2
       case('LMT')
         read (101,'(500000i1)')  G_int
-    end select  
+        WHERE(G_int > 2)  G_int = -1
+    end select 
+    
+    ! character vector for output. set missing values first 
+    if (OutFormat /= 'PED') then
+      select case (OutFormat)
+        case ('SEQ')
+          G_char = '-1'
+        case ('RAW')
+          G_char = 'NA'
+        case ('LMT')
+          G_char = '9 '
+      end select
+      WHERE(G_int==0) G_char='0 '
+      WHERE(G_int==1) G_char='1 '
+      WHERE(G_int==2) G_char='2 '
+    endif
     
     select case (OutFormat)
       case ('SEQ')
-        write(202, '(a40, 100000i3)') Id(i), G_int
+        write(202, '(a40, 100000a3)') Id(i), G_char
       case('PED')
         write(202, '(i3,2x,a40,4i3,2x, 200000i2)') 0, Id(i), 0,0,0,0, One2Two(G_int)
       case('RAW')
-        do l=1,nSnp
-          write(G_char(l), '(i2)')  G_int(l)
-        enddo
-        WHERE (G_char == '-9')  G_char = 'NA'
         write(202, '(i4,2x,a40,4i5,2x, 200000a3)') 0, Id(i), 0,0,0,0, G_char
       case('LMT')
         if (any(G_int < 0) .and. .not. DidWarn) then  ! warning once is enough
           print *, 'WARNING: LMT does not support missing values! Coded as 9 in output'
-!          stop
           DidWarn = .TRUE.         
         endif
-        WHERE (G_int < 0)  G_int = 9
-        write(202,'(500000i1)')  G_int
+        write(202,'(500000a1)')  G_char
     end select      
 
   enddo
@@ -447,32 +365,35 @@ subroutine Reformat
   ! deallocate all the stuff 
   ! TODO
   
-  
-  !~~~~~~~~~~~~
+
   contains
-    function One2Two(G)  ! From 1-column-per-SNP to 2-columns-per-SNP
-      integer(kind=is), intent(IN) :: G(0:(nSnp-1))
-      integer(kind=is) :: One2Two(0:(nSnp*2-1))
+    !~~~~~~~~~~~~~~
+    ! From 1-column-per-SNP to 2-columns-per-SNP
+    function One2Two(G)  
+      integer(kind=ishort), intent(IN) :: G(0:(nSnp-1))
+      integer(kind=ishort) :: One2Two(0:(nSnp*2-1))
       integer :: l,m
       
       do l=0,(nSNP-1)
         m = 2*l
         select case (G(l))
           case (0)
-            One2Two(m:(m+1)) = (/1_is,1_is/)  
+            One2Two(m:(m+1)) = (/1_ishort,1_ishort/)  
           case (1)
-            One2Two(m:(m+1)) = (/1_is,2_is/)  
+            One2Two(m:(m+1)) = (/1_ishort,2_ishort/)  
           case (2)
-            One2Two(m:(m+1)) = (/2_is,2_is/)   
+            One2Two(m:(m+1)) = (/2_ishort,2_ishort/)   
           case default  ! missing
-            One2Two(m:(m+1)) = (/0_is,0_is/)   
+            One2Two(m:(m+1)) = (/0_ishort,0_ishort/)   
         end select   
       enddo   
     end function One2Two
     
-    function Two2One(G)  ! From 2-columns-per-SNP to 1-column-per-SNP
-      integer(kind=is), intent(IN) :: G(0:(2*nSnp-1))
-      integer(kind=is) :: Two2One(0:(nSnp-1))
+    !~~~~~~~~~~~~~~
+    ! From 2-columns-per-SNP to 1-column-per-SNP
+    function Two2One(G)  
+      integer(kind=ishort), intent(IN) :: G(0:(2*nSnp-1))
+      integer(kind=ishort) :: Two2One(0:(nSnp-1))
       integer :: l,m
       character(len=2) :: Gm
       
