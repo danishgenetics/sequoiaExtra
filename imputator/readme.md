@@ -521,6 +521,9 @@ further testing and optimising is needed).
 The iterative peeling step is done before the genotype cleaning step,
 and again between the genotype cleaning step and the imputation step.
 
+> [!NOTE]  
+> This genotyping cleaning is only available with `method=full`; with the other methods it is impossible to pinpoint whether a Mendelian inconsistency is due to a genotyping error in the parent, or in the offspring. 
+
 ------------------------------------------------------------------------
 
 # Options
@@ -545,9 +548,10 @@ the same individual (prob_S), parent-offspring (prob_PO), full siblings
 (prob_FS), second degree relatives (prob_GP), third degree relatives
 (prob_HA), or unrelated individuals (prob_UU).
 
-Note that only genotyped-genotyped parent-offspring pairs are
+> [!NOTE]
+> Only genotyped-genotyped parent-offspring pairs are
 considered. E.g. full sibling pairs where one or both parents are not
-genotyped are not checked, for this run `sequoia`
+genotyped are not checked. For this, run `sequoia`
 (<https://github.com/JiscaH/sequoia_notR>) with only option
 `--pedigreeIN <filename>`, which is analogous to function `CalcOHLLR()`
 in the sequoia R package
@@ -614,6 +618,10 @@ file into N chunks, do the calculations on each chunk in parallel,
 combine the logfiles, and apply the full list of edits to the original
 genotype file.
 
+> [!NOTE]  
+> Not yet compatible with `--impute-all`. 
+
+
 ## snpclean + imputation log
 
 By default a log file is created with a record for each edit made to the
@@ -627,13 +635,19 @@ for completely non-genotyped individuals in the pedigree (when
 the input and output genotype file, coded as 0/1/2 and -1 for missing
 values.
 
-Note that if a genotype was first set to missing by `snpclean`, and then
+> [!NOTE]
+> If a genotype was first set to missing by `snpclean`, and then
 imputed by `impute`, there will be 2 entries in the log.
 
 The filename for this log can be specified with `--edits-out`. The log
 can also be turned off with `--no-edits-out`, which gives a slight speed
 increase - which is neglible with `method=full`, but can be relatively
 large for the faster methods.
+
+> [!TIP]  
+> The edits log can later be combined with the original genotype file to
+an imputed genotype file, without having to run the imputation again.
+This can be done with `--edits-in`.
 
 # Algorithm details
 
