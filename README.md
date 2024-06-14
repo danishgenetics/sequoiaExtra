@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> THE LATEST VERSIONS OF THE FORTRAN PROGRAMS ARE NOW IN https://github.com/JiscaH/Fortran
+>
+
+
 # sequoiaExtra
 
 This is a collection of R functions and Fortran programs loosely associated with R package sequoia and/or for general population genetics purposes. 
